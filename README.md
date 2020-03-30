@@ -16,7 +16,7 @@
 
 服务端渲染和SPA不同，需要有client和server俩个入口进行打包，因为需要在服务端和客户端分别渲染
 
-![avatar](https://cf.jd.com/download/thumbnails/275456682/image2020-3-26_17-48-49.png?version=1&modificationDate=1585216130000&api=v2)
+<img src="https://cf.jd.com/download/thumbnails/275456682/image2020-3-26_17-48-49.png?version=1&modificationDate=1585216130000&api=v2" width="50%">
 
 1、entry-client.js(客户端)中简单的挂载#app
 
@@ -29,9 +29,29 @@ app.$mount('#app');
 ```
 
 2、entry-server.js（服务端）中是一个简单的promise回调函数，主要是保证在服务端渲染之前获取到初始数据然后返回app组件实例，
-
-
-
+```javascript
+import { createApp } from './app.js';
+export default context => {
+  return new Promise((resolve, reject) => {
+    const { app, store, router, App } = createApp();
+    router.push(context.url);
+    router.onReady(() => {
+      const matchedComponents = router.getMatchedComponents();
+      if (!matchedComponents.length) {
+        return reject({ code: 404 });
+      }
+      Promise.all(matchedComponents.map(component => {
+        if (component.asyncData) {
+          return component.asyncData({ store });
+        }
+      })).then(() => {
+          context.state = store.state;
+        resolve(app);
+      });
+    }, reject);
+  });
+}
+```
 router.onReady()为了保证router中的异步懒加载组件加载完成
 
 router.getMatchedComponents()用于获取与上下文访问的url匹配的组件
@@ -44,23 +64,77 @@ router.getMatchedComponents()用于获取与上下文访问的url匹配的组件
 
 window.__INITIAL_STATE__属性。asyncData组件中的位置如下：
 
+```javascript
+  export default {
+    asyncData: fetchInitialData,
+    methods: {
+      onHandleClick() {
+        alert('bar');
+      }
+    },
+    mounted() {
+      // 因为服务端渲染只有 beforeCreate 和 created 两个生命周期，不会走这里
+      // 所以把调用 Ajax 初始化数据也写在这里，是为了供单独浏览器渲染使用
+      let store = this.$store;
+      fetchInitialData({ store });
+    },
+    computed: {
+      msg() {
+        return this.$store.state.bar;
+      }
+    }
+  }
 
+```
 
 3、客户端index.html模板文件
 
-
+```javascript
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>浏览器渲染</title>
+</head>
+<body>
+  <div id="app"></div>
+</body>
+</html>
+```
 
 前端资源挂载到app的dom中。
 
 服务端ndex.ssr.html模板文件
 
-
+```javascript
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>服务端渲染</title>
+</head>
+<body>
+  <!--vue-ssr-outlet-->
+</body>
+</html>
+```
 
 服务端渲染的html字符串会通过vue-server-renderer插件识别出<!--vue-ssr-outlet-->标记的占位符，插入到此位置（所以模板中这个占位符可不要删除哦）
 
 4、store文件
 
-
+```javascript
+if (typeof window !== 'undefined' && window.__INITIAL_STATE__) {
+    console.log('window.__INITIAL_STATE__', window.__INITIAL_STATE__);
+    store.replaceState(window.__INITIAL_STATE__);
+  } else {
+    console.log('no browser');
+  }
+```
 
 store中会在浏览器端渲染的时候对windows中的__INITIAL_STATE__属性做判断，主要是为了保证服务端和前端的state状态一致，前端激活服务端渲染的
 
@@ -74,7 +148,27 @@ webpack.base.config.js是基础配置文件，里面配置一些常用的loader�
 
 webpack.client.config.js文件：
 
+```javascript
+const path = require('path');
+const merge = require('webpack-merge');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const VueSSRClientPlugin = require('vue-server-renderer/client-plugin');
+const base = require('./webpack.base.config');
 
+module.exports = merge(base, {
+  entry: {
+    client: path.resolve(__dirname, '../src/entry-client.js')
+  },
+
+  plugins: [
+    new VueSSRClientPlugin(),
+    new HtmlWebpackPlugin({
+      template: path.resolve(__dirname, '../src/index.html'),
+      filename: 'index.html'
+    })
+  ]
+});
+```
 
 merge了base文件，入口为客户端的entry-client.js
 
@@ -82,19 +176,41 @@ VueSSRClientPlugin插件作用是生成客户端json文件vue-ssr-client-manifes
 
 webpack.server.config.js文件：
 
+```javascript
+const path = require('path');
+const merge = require('webpack-merge');
+const nodeExternals = require('webpack-node-externals');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const VueSSRServerPlugin = require('vue-server-renderer/server-plugin');
+const base = require('./webpack.base.config');
 
+module.exports = merge(base, {
+  target: 'node',
+   // 对 bundle renderer 提供 source map 支持
+  devtool: '#source-map',
+  entry: {
+    server: path.resolve(__dirname, '../src/entry-server.js')
+  },
+  externals: [nodeExternals()],
+  output: {
+    libraryTarget: 'commonjs2'
+  },
+  plugins: [
+    new VueSSRServerPlugin(),  
+    new HtmlWebpackPlugin({
+      template: path.resolve(__dirname, '../src/index.ssr.html'),
+      filename: 'index.ssr.html',
+      excludeChunks: ['server']
+    })
+  ]
+});
+```
 
 同样merge了base文件，入口为客户端的entry-server.js
 
-
-
 VueSSRServerPlugin插件作用是生成服务端的json文件vue-ssr-server-bundle.json，作用server.js文件中会讲
 
-
-
 target: 'node'的作用是让webpack以适用node的形式处理导入文件方式
-
-
 
 libraryTarget: 'commonjs2'使用node风格导出模块，用于server端渲染
 
@@ -102,7 +218,23 @@ libraryTarget: 'commonjs2'使用node风格导出模块，用于server端渲染
 
 server文件为后端服务文件，其中主要处理服务端渲染，以及页面请求的输出等
 
+```javascript
+const { createBundleRenderer } = require('vue-server-renderer');
+const backendApp = new Koa();
+const frontendApp = new Koa();
+const backendRouter = new Router();
+const frontendRouter = new Router();
 
+const serverBundle = require(path.resolve(__dirname, '../dist/vue-ssr-server-bundle.json'));
+const clientManifest = require(path.resolve(__dirname, '../dist/vue-ssr-client-manifest.json'));
+const template = fs.readFileSync(path.resolve(__dirname, '../dist/index.ssr.html'), 'utf-8');
+
+const renderer = createBundleRenderer(serverBundle, {
+  runInNewContext: false,
+  template: template,
+  clientManifest: clientManifest
+});
+```
 
 这段代码主要是使用vue-server-renderer插件，来处理服务端渲染，插件中的createBundleRenderer方法可以将服务端的bundle.json文件
 
@@ -110,7 +242,12 @@ server文件为后端服务文件，其中主要处理服务端渲染，以及�
 
 clientManifest静态资源也会在适当机会defer进模板中。
 
-
+```javascript
+const ssrStream = renderer.renderToStream(context);
+  ctx.status = 200;
+  ctx.type = 'html';
+  ctx.body = ssrStream;
+```
 
 在render中融合的资源通过render的renderToStream方法输出html字符串返回给浏览器端
 
