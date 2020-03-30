@@ -16,11 +16,17 @@
 
 服务端渲染和SPA不同，需要有client和server俩个入口进行打包，因为需要在服务端和客户端分别渲染
 
-![avatar](/user/desktop/doge.png)
+![avatar](https://cf.jd.com/download/thumbnails/275456682/image2020-3-26_17-48-49.png?version=1&modificationDate=1585216130000&api=v2)
 
 1、entry-client.js(客户端)中简单的挂载#app
 
+```javascript
+import { createApp } from './app.js';
 
+const { app } = createApp();
+
+app.$mount('#app');
+```
 
 2、entry-server.js（服务端）中是一个简单的promise回调函数，主要是保证在服务端渲染之前获取到初始数据然后返回app组件实例，
 
