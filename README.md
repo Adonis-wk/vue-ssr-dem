@@ -18,7 +18,7 @@
 
 ![目录结构](./src/assets/list.png)
 
-### 1、entry-client.js(客户端)中简单的挂载#app
+### 1、```entry-client.js（客户端）```中简单的挂载#app
 
 ```javascript
 import { createApp } from './app.js';
@@ -28,7 +28,7 @@ const { app } = createApp();
 app.$mount('#app');
 ```
 
-### 2、entry-server.js（服务端）中是一个简单的promise回调函数，主要是保证在服务端渲染之前获取到初始数据然后返回app组件实例，
+### 2、```entry-server.js（服务端）```中是一个简单的promise回调函数，主要是保证在服务端渲染之前获取到初始数据然后返回app组件实例，
 ```javascript
 import { createApp } from './app.js';
 export default context => {
@@ -125,7 +125,7 @@ export default context => {
 
 服务端渲染的```html```字符串会通过```vue-server-renderer```插件识别出```<!--vue-ssr-outlet-->```标记的占位符，插入到此位置（所以模板中这个占位符可不要删除哦）
 
-### 4、store文件
+### 4、```store```文件
 
 ```javascript
 if (typeof window !== 'undefined' && window.__INITIAL_STATE__) {
@@ -214,7 +214,7 @@ module.exports = merge(base, {
 
 ```libraryTarget: 'commonjs2'```使用```node```风格导出模块，用于```server```端渲染
 
-### 2、server.js文件
+### 2、```server.js```文件
 
 ```server```文件为后端服务文件，其中主要处理服务端渲染，以及页面请求的输出等
 
@@ -253,7 +253,7 @@ const ssrStream = renderer.renderToStream(context);
 
 然后在浏览器端渲染输出。
 
-服务端渲染ssr页面展示如下：
+### 服务端渲染```ssr```页面展示如下：
 
 ![页面渲染结果](./src/assets/list3.png)
 
@@ -269,7 +269,7 @@ const ssrStream = renderer.renderToStream(context);
 
 ## 四、总结
 
-### 1、服务端渲染有些学习成本，对node要有基础
+### 1、服务端渲染有些学习成本，对```node```要有基础
 
 ### 2、最好只用于首屏渲染（其他地方使用，感觉作用不大，还浪费资源）
 
